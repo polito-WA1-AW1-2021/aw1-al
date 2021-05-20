@@ -1,52 +1,81 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import { Container, Row } from 'react-bootstrap';
-import {ExamScores, ExamForm} from './ExamComponents.js';
+import { ExamScores, ExamForm } from './ExamComponents.js';
 import AppTitle from './AppTitle.js';
-import dayjs from 'dayjs';
-import { useState } from 'react';
-import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
+//import dayjs from 'dayjs';
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import API from './API';
 
-const fakeExams = [
-  {coursecode: '01TYMOV', score: 28, date: dayjs('2021-03-01')},
-  {coursecode: '01SQJOV', score: 29, date: dayjs('2021-06-03')},
-  {coursecode: '04GSPOV', score: 18, date: dayjs('2021-05-24')},
-  {coursecode: '01TXYOV', score: 24, date: dayjs('2021-06-21')},
-];
-
-const fakeCourses = [
-  {coursecode: '01TYMOV', name: 'Information systems security'},
-  {coursecode: '02LSEOV', name: 'Computer architectures'},
-  {coursecode: '01SQJOV', name: 'Data Science and Database Technology'},
-  {coursecode: '01OTWOV', name: 'Computer network technologies and services'},
-  {coursecode: '04GSPOV', name: 'Software Engineering'},
-  {coursecode: '01TXYOV', name: 'Web Applications I'},
-  {coursecode: '01NYHOV', name: 'System and device programming'},
-  {coursecode: '01TYDOV', name: 'Cloud Computing'},
-  {coursecode: '01SQPOV', name: 'Software Networking'},
-];
 
 function App() {
-  const [exams, setExams] = useState([...fakeExams]);
+  const [exams, setExams] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [dirty, setDirty] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const examCodes = exams.map(exam => exam.coursecode) ;
+  useEffect(() => {
+    const getCourses = async () => {
+      const courses = await API.getAllCourses();
+      setCourses(courses);
+    };
+    getCourses();
+  }, []);
+
+  useEffect(() => {
+    const getExams = async () => {
+      const exams = await API.getAllExams();
+      setExams(exams);
+    };
+    if (courses.length && dirty) {
+      getExams().then(() => {
+        setLoading(false);
+        setDirty(false);
+      }
+      );
+    }
+  }, [courses.length, dirty]);
+
+  const examCodes = exams.map(exam => exam.coursecode);
 
   const deleteExam = (coursecode) => {
-    setExams((exs) => exs.filter(ex => ex.coursecode !== coursecode))
+    //setExams((exs) => exs.filter(ex => ex.coursecode !== coursecode))
+    // temporary set the deleted item as "in progress"
+    setExams(oldExams => {
+      return oldExams.map(ex => {
+        if (ex.coursecode === coursecode)
+          return {...ex, status: 'deleted'};
+        else
+          return ex;
+      });
+    });
+
+    API.deleteExam(coursecode)
+      .then(() => setDirty(true));
   }
 
   const addExam = (exam) => {
+    exam.status = 'added';
     setExams(oldExams => [...oldExams, exam]);
+
+    API.addExam(exam)
+      .then(() => setDirty(true));
   }
 
   const updateExam = (exam) => {
     setExams(oldExams => {
       return oldExams.map(ex => {
         if (ex.coursecode === exam.coursecode)
-          return {coursecode: exam.coursecode, score: exam.score, date: exam.date};
+          return {coursecode: exam.coursecode, score: exam.score, date: exam.date, status: 'updated'};
         else
           return ex;
       });
+    });
+
+    API.updateExam(exam)
+    .then(() => {
+      setDirty(true);
     });
   }
 
@@ -57,26 +86,27 @@ function App() {
       </Row>
 
       <Switch>
-        <Route path="/add" render={() => 
-          <ExamForm courses={fakeCourses.filter(course => !examCodes.includes(course.coursecode))} addOrUpdateExam={addExam}></ExamForm>
-        }/>
+        <Route path="/add" render={() =>
+          <ExamForm courses={courses.filter(course => !examCodes.includes(course.coursecode))} addOrUpdateExam={addExam}></ExamForm>
+        } />
 
         {/* without useLocation():
         <Route path="/update" render={(routeProps) => 
-          <ExamForm courses={fakeCourses} exam={routeProps.location.state.exam} examDate={routeProps.location.state.examDate} addOrUpdateExam={updateExam}></ExamForm>
+          <ExamForm courses={courses} exam={routeProps.location.state.exam} examDate={routeProps.location.state.examDate} addOrUpdateExam={updateExam}></ExamForm>
         }/>
         */}
         {/* with useLocation() in ExamForm */}
-        <Route path="/update" render={() => 
-          <ExamForm courses={fakeCourses} addOrUpdateExam={updateExam}></ExamForm>
-        }/>
+        <Route path="/update" render={() =>
+          <ExamForm courses={courses} addOrUpdateExam={updateExam}></ExamForm>
+        } />
 
-        <Route path="/" render={() => 
+        <Route path="/" render={() =>
           <Row>
-            <ExamScores exams={exams} courses={fakeCourses} deleteExam={deleteExam}/>
+            {loading ? <span>🕗 Please wait, loading your exams... 🕗</span> :
+            <ExamScores exams={exams} courses={courses} deleteExam={deleteExam} /> }
           </Row>
         } />
-        
+
       </Switch>
     </Container>
   </Router>);

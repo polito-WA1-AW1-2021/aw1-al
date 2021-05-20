@@ -19,7 +19,7 @@ app.use(express.json());
 // GET /api/courses
 app.get('/api/courses', (req, res) => {
   dao.listCourses()
-    .then(courses => res.json(courses))
+    .then(courses => setTimeout(()=>res.json(courses), 3000))
     .catch(() => res.status(500).end());
 });
 
