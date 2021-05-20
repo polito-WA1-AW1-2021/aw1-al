@@ -3,7 +3,7 @@ import {useState, useEffect} from 'react';
 function ShoppingList() {
   const [list, setList] = useState([]);
   const [element, setElement] = useState('');
-  const [update, setUpdate] = useState(false);
+  const [update, setUpdate] = useState(true);
 
   useEffect(()=> {
     const getItems = async() => {
